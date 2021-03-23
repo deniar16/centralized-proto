@@ -1,0 +1,61 @@
+#!/bin/bash
+
+set -e
+
+if [ -x /script/protogolang ]
+then
+     echo "File has execute permission"
+else
+     echo "You don't have execute permission"
+fi
+
+ProjectPathPure=$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )
+ProjectPath=${ProjectPathPure///script/}
+removeString="option go_package = \"github.com/deniarianto1606/centralized-proto"
+
+if ! [ -s .golang/gen ]; then
+	mkdir -p golang/gen
+fi
+rm -rf ./golang/gen/*
+protoFolder="./proto"
+echo "$protoFolder : proto folder nih "
+for protoFile in "$protoFolder"/*
+do
+    echo "protoFile = $protoFile"
+    packageProto=""
+    if [[ -f $protoFile ]]; then
+        cnty="option go_package"
+        while read -r line
+        do
+            case $line in
+                *${cnty}*)
+                    packageProto="$line"
+                    ;;
+                *)
+            esac
+        done < "${protoFile}"
+        echo " packageProto : $packageProto"
+        echo " gopath : $GOPATH"
+        echo " projectPath : $ProjectPath"
+        IFS="/"
+        read -ra splitProto <<< "$protoFile"
+        fileName="${splitProto[2]}"
+        IFS="."
+        read -ra splitFileName <<< "$fileName"
+        fileNameProto="${splitFileName[0]}"
+        edit1=${packageProto//option go_package = \"github.com\/deniarianto1606\/centralized-proto\//}
+        folderName="${edit1//\";/}"
+        folderName="${folderName//"option go_package = \""/}"
+        folderName="${folderName//"option go_package= \""/}"
+        folderName="${folderName//"option go_package =\""/}"
+        folderName="${folderName//"option go_package=\""/}"
+        echo " folderName nih  : $folderName"
+        mkdir -p $folderName
+        cd "proto"
+        protoc --proto_path=$GOPATH/src:. --proto_path=$ProjectPath/proto:. \
+            --proto_path=$ProjectPath/proto:. \
+            --go_out=paths=source_relative,plugins=grpc:../$folderName \
+            $fileNameProto.proto
+        cd ".."
+    fi
+done
